@@ -86,9 +86,9 @@ export class ZaloUser implements INodeType {
 
 						returnData.push({
 							json: {
-                                status: "Thành công",
-                                response: response,
-                            },
+								status: "Thành công",
+								response: response,
+							},
 							pairedItem: {
 								item: i,
 							},
@@ -104,9 +104,9 @@ export class ZaloUser implements INodeType {
 
 						returnData.push({
 							json: {
-                                status: "Thành công",
-                                response: response,
-                            },
+								status: "Thành công",
+								response: response,
+							},
 							pairedItem: {
 								item: i,
 							},
@@ -121,9 +121,9 @@ export class ZaloUser implements INodeType {
 
 						returnData.push({
 							json: {
-                                status: "Thành công",
-                                response: response,
-                            },
+								status: "Thành công",
+								response: response,
+							},
 							pairedItem: {
 								item: i,
 							},
@@ -138,9 +138,9 @@ export class ZaloUser implements INodeType {
 
 						returnData.push({
 							json: {
-                                status: "Thành công",
-                                response: response,
-                            },
+								status: "Thành công",
+								response: response,
+							},
 							pairedItem: {
 								item: i,
 							},
@@ -156,9 +156,9 @@ export class ZaloUser implements INodeType {
 
 					// 	returnData.push({
 					// 		json: {
-                    //             status: "Thành công",
-                    //             response: response,
-                    //         },
+					//             status: "Thành công",
+					//             response: response,
+					//         },
 					// 		pairedItem: {
 					// 			item: i,
 					// 		},
@@ -171,13 +171,13 @@ export class ZaloUser implements INodeType {
 						const dob = this.getNodeParameter('dob', i) as any;
 						const gender = this.getNodeParameter('gender', i) as number;
 
-						const response = await api.updateProfile(name, dob, gender);
+						const response = await api.updateProfile({ profile: { name, dob, gender } });
 
 						returnData.push({
 							json: {
-                                status: "Thành công",
-                                response: response,
-                            },
+								status: "Thành công",
+								response: response,
+							},
 							pairedItem: {
 								item: i,
 							},
@@ -207,8 +207,8 @@ export class ZaloUser implements INodeType {
 
 						returnData.push({
 							json: {
-                                friends: friends,
-                            },
+								friends: friends,
+							},
 							pairedItem: {
 								item: i,
 							},
