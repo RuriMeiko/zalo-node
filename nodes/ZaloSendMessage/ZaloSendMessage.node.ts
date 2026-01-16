@@ -246,12 +246,35 @@ export class ZaloSendMessage implements INodeType {
 				],
 			},
 			{
+				displayName: 'Style Input Mode',
+				name: 'styleInputMode',
+				type: 'options',
+				displayOptions: {
+					show: {
+						messageInputStyle: ['fields'],
+					},
+				},
+				options: [
+					{
+						name: 'UI Fields',
+						value: 'fields',
+					},
+					{
+						name: 'JSON Array',
+						value: 'json',
+					},
+				],
+				default: 'fields',
+				description: 'Chọn cách nhập định dạng văn bản (styles)',
+			},
+			{
 				displayName: 'Styles',
 				name: 'styles',
 				type: 'fixedCollection',
 				displayOptions: {
 					show: {
 						messageInputStyle: ['fields'],
+						styleInputMode: ['fields'],
 					},
 				},
 				typeOptions: {
@@ -311,6 +334,19 @@ export class ZaloSendMessage implements INodeType {
 						],
 					},
 				],
+			},
+			{
+				displayName: 'Styles JSON',
+				name: 'stylesJson',
+				type: 'json',
+				default: '[]',
+				displayOptions: {
+					show: {
+						messageInputStyle: ['fields'],
+						styleInputMode: ['json'],
+					},
+				},
+				description: 'Nhập mảng JSON định dạng (e.g., [{"start": 0, "len": 5, "st": "b"}])',
 			},
 			{
 				displayName: 'TTL (Time To Live)',
@@ -422,7 +458,7 @@ export class ZaloSendMessage implements INodeType {
 					const urgency = this.getNodeParameter('urgency', i, 0) as number;
 					const quote = this.getNodeParameter('quote', i, {}) as any;
 					const mentions = this.getNodeParameter('mentions', i, {}) as any;
-					const styles = this.getNodeParameter('styles', i, {}) as any;
+					const styleInputMode = this.getNodeParameter('styleInputMode', i, 'fields') as string;
 					const ttl = this.getNodeParameter('ttl', i, 0) as number;
 					const attachments = this.getNodeParameter('attachments', i, {}) as any;
 
@@ -464,18 +500,24 @@ export class ZaloSendMessage implements INodeType {
 					}
 
 					// Add styles if specified
-					if (styles && styles.style && styles.style.length > 0) {
-						messageContent.styles = styles.style.map((s: any) => {
-							const styleObj: any = {
-								start: s.start || 0,
-								len: s.len || 0,
-								st: s.st,
-							};
-							if (s.st === 'ind_$') {
-								styleObj.indentSize = s.indentSize || 1;
-							}
-							return styleObj;
-						});
+					if (styleInputMode === 'json') {
+						const stylesJson = this.getNodeParameter('stylesJson', i, '[]') as string;
+						messageContent.styles = typeof stylesJson === 'string' ? JSON.parse(stylesJson) : stylesJson;
+					} else {
+						const styles = this.getNodeParameter('styles', i, {}) as any;
+						if (styles && styles.style && styles.style.length > 0) {
+							messageContent.styles = styles.style.map((s: any) => {
+								const styleObj: any = {
+									start: s.start || 0,
+									len: s.len || 0,
+									st: s.st,
+								};
+								if (s.st === 'ind_$') {
+									styleObj.indentSize = s.indentSize || 1;
+								}
+								return styleObj;
+							});
+						}
 					}
 
 					// Add attachments if specified

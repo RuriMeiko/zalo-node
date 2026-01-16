@@ -5,7 +5,8 @@ This version is a fork of [dinhtrung1308/zalo-node](https://github.com/dinhtrung
 ## Main Enhancements
 
 ### Zalo Send Message Node
-- **Flexible Message Input**: Added an "Input Style" selector that allows switching between traditional UI fields and raw JSON input (`messageJson`).
+- **Flexible Message Input**: Added an "Input Style" selector that allows switching between traditional UI fields and raw JSON input (`messageJson`) for the entire message.
+- **Improved Style Input (v 0.6.3)**: Added "Style Input Mode" specifically for message formatting. This allows passing a raw JSON array of styles, making it easier to carry formatting over from other nodes.
 - **Extended Quote Support**: Added support for additional quote fields: `propertyExt`, `cliMsgId`, and `ttl`.
 - **Improved UI**: All collection items are now alphabetized by their display name for better usability.
 
