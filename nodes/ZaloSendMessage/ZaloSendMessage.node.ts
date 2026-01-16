@@ -339,7 +339,7 @@ export class ZaloSendMessage implements INodeType {
 				displayName: 'Styles JSON',
 				name: 'stylesJson',
 				type: 'json',
-				default: '[]',
+				default: '[\n  { "start": 0, "len": 5, "st": "b" },\n  { "start": 6, "len": 5, "st": "i" },\n  { "start": 12, "len": 5, "st": "u" },\n  { "start": 18, "len": 5, "st": "s" },\n  { "start": 24, "len": 5, "st": "c_db342e" },\n  { "start": 30, "len": 5, "st": "f_18" },\n  { "start": 36, "len": 5, "st": "ind_$", "indentSize": 1 }\n]',
 				displayOptions: {
 					show: {
 						messageInputStyle: ['fields'],
