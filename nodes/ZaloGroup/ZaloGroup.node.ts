@@ -16,7 +16,7 @@ export class ZaloGroup implements INodeType {
 		displayName: 'Zalo Group',
 		name: 'zaloGroup',
 		icon: 'file:../shared/zalo.svg',
-		group: ['Zalo'],
+		group: ['Zalo' as any],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Quản lý nhóm Zalo',
