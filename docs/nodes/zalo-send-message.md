@@ -18,6 +18,8 @@ Node `Zalo Send Message` dùng `api.sendMessage(message, threadId[, type])` củ
 
 Phù hợp khi muốn cấu hình trực tiếp trên UI của n8n.
 
+Khi bấm `Add Mention` hoặc `Add Style`, node sẽ tạo sẵn một item mẫu để bạn sửa nhanh ngay trong UI.
+
 Các trường chính:
 
 - `Thread ID`: ID người nhận hoặc nhóm
@@ -34,7 +36,29 @@ Các trường chính:
 
 Phù hợp khi bạn đã có sẵn payload theo đúng format của `zca-js`.
 
-Ví dụ:
+Mẫu `styles` trong node đã được điền sẵn đầy đủ các kiểu style hỗ trợ; bạn chỉ cần xoá bớt phần không dùng.
+
+Ví dụ `styles`:
+
+```json
+[
+	{ "start": 0, "len": 5, "st": "b" },
+	{ "start": 6, "len": 5, "st": "i" },
+	{ "start": 12, "len": 5, "st": "u" },
+	{ "start": 18, "len": 5, "st": "s" },
+	{ "start": 24, "len": 5, "st": "c_db342e" },
+	{ "start": 30, "len": 5, "st": "c_f27806" },
+	{ "start": 36, "len": 5, "st": "c_f7b503" },
+	{ "start": 42, "len": 5, "st": "c_15a85f" },
+	{ "start": 48, "len": 5, "st": "f_13" },
+	{ "start": 54, "len": 5, "st": "f_18" },
+	{ "start": 60, "len": 5, "st": "lst_1" },
+	{ "start": 66, "len": 5, "st": "lst_2" },
+	{ "start": 72, "len": 5, "st": "ind_$", "indentSize": 1 }
+]
+```
+
+Ví dụ `mentions`:
 
 ```json
 {
@@ -56,6 +80,26 @@ Ví dụ:
 			"start": 0,
 			"len": 12,
 			"st": "c_db342e"
+		}
+	]
+}
+```
+
+Nếu bạn muốn tag nhiều người, chỉ cần thêm nhiều phần tử vào mảng `mentions`:
+
+```json
+{
+	"msg": "Xin chào @An và @Binh",
+	"mentions": [
+		{
+			"uid": "0000000000000000",
+			"pos": 9,
+			"len": 3
+		},
+		{
+			"uid": "1111111111111111",
+			"pos": 16,
+			"len": 5
 		}
 	]
 }
@@ -117,9 +161,7 @@ Ví dụ muốn tô đỏ chữ `@An` trong câu `Xin chào @An`:
 ]
 ```
 
-Bạn có thể chồng nhiều styles lên cùng một đoạn text, ví dụ vừa `Bold` vừa `Red` vừa `Big`.
-
-Ví dụ:
+Ví dụ kết hợp nhiều style trên cùng một đoạn text:
 
 ```json
 [
@@ -129,7 +171,7 @@ Ví dụ:
 ]
 ```
 
-### Ví dụ nhanh theo từng màu
+Ví dụ nhanh theo từng màu:
 
 ```json
 [
@@ -139,6 +181,8 @@ Ví dụ:
 	{ "start": 14, "len": 5, "st": "c_15a85f" }
 ]
 ```
+
+Bạn có thể chồng nhiều styles lên cùng một đoạn text, ví dụ vừa `Bold` vừa `Red` vừa `Big`.
 
 ## Mention người dùng
 
@@ -199,6 +243,25 @@ Ví dụ:
 }
 ```
 
+### Cách 3: Truyền thẳng mảng JSON mentions
+
+Nếu bạn đã tính sẵn vị trí và muốn tag nhiều người, có thể truyền trực tiếp mảng JSON:
+
+```json
+[
+	{
+		"uid": "0000000000000000",
+		"pos": 9,
+		"len": 3
+	},
+	{
+		"uid": "1111111111111111",
+		"pos": 20,
+		"len": 4
+	}
+]
+```
+
 ## Ví dụ kết hợp style màu và mention
 
 Message:
@@ -215,6 +278,23 @@ Mentions:
 		"uid": "0000000000000000",
 		"pos": 9,
 		"len": 3
+	}
+]
+```
+
+Ví dụ dùng cùng lúc nhiều tag:
+
+```json
+[
+	{
+		"uid": "0000000000000000",
+		"pos": 9,
+		"len": 3
+	},
+	{
+		"uid": "1111111111111111",
+		"pos": 20,
+		"len": 4
 	}
 ]
 ```

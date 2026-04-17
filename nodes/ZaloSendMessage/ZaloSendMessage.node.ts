@@ -378,9 +378,18 @@ export class ZaloSendMessage implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Mention',
-				default: {},
+				default: {
+					mention: [
+						{
+							mode: 'text',
+							uid: '0000000000000000',
+							text: '@An',
+							occurrence: 1,
+						},
+					],
+				},
 				description:
-					'Chỉ áp dụng cho Type = Group. Có thể nhập nhiều mention để tag nhiều người; hỗ trợ cả mảng mention chuẩn hoặc object từ UI.',
+					'Chỉ áp dụng cho Type = Group. Có sẵn một mention mẫu để bạn chỉnh sửa nhanh; hỗ trợ cả mảng mention chuẩn hoặc object từ UI.',
 				options: [
 					{
 						name: 'mention',
@@ -465,6 +474,42 @@ export class ZaloSendMessage implements INodeType {
 					},
 				],
 			},
+				{
+					displayName: 'Mentions Input Mode',
+					name: 'mentionsInputMode',
+					type: 'options',
+					displayOptions: {
+						show: {
+							messageInputStyle: ['fields'],
+						},
+					},
+					options: [
+						{
+							name: 'UI Fields',
+							value: 'fields',
+						},
+						{
+							name: 'JSON Array',
+							value: 'json',
+						},
+					],
+					default: 'fields',
+					description: 'Chọn cách nhập mentions',
+				},
+				{
+					displayName: 'Mentions JSON',
+					name: 'mentionsJson',
+					type: 'json',
+					default:
+						'[\n  { "pos": 9, "uid": "0000000000000000", "len": 4 },\n  { "pos": 20, "uid": "1111111111111111", "len": 5 }\n]',
+					displayOptions: {
+						show: {
+							messageInputStyle: ['fields'],
+							mentionsInputMode: ['json'],
+						},
+					},
+					description: 'Nhập mảng JSON mentions (e.g., [{"pos": 9, "uid": "0000000000000000", "len": 4}])',
+				},
 			{
 				displayName: 'Style Input Mode',
 				name: 'styleInputMode',
@@ -501,7 +546,15 @@ export class ZaloSendMessage implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Style',
-				default: {},
+				default: {
+					style: [
+						{
+							st: 'b',
+							start: 0,
+							len: 5,
+						},
+					],
+				},
 				options: [
 					{
 						name: 'style',
@@ -560,14 +613,14 @@ export class ZaloSendMessage implements INodeType {
 				name: 'stylesJson',
 				type: 'json',
 				default:
-					'[\n  { "start": 0, "len": 5, "st": "b" },\n  { "start": 6, "len": 5, "st": "i" },\n  { "start": 12, "len": 5, "st": "u" },\n  { "start": 18, "len": 5, "st": "s" },\n  { "start": 24, "len": 5, "st": "c_db342e" },\n  { "start": 30, "len": 5, "st": "f_18" },\n  { "start": 36, "len": 5, "st": "ind_$", "indentSize": 1 }\n]',
+					'[\n  { "start": 0, "len": 5, "st": "b" },\n  { "start": 6, "len": 5, "st": "i" },\n  { "start": 12, "len": 5, "st": "u" },\n  { "start": 18, "len": 5, "st": "s" },\n  { "start": 24, "len": 5, "st": "c_db342e" },\n  { "start": 30, "len": 5, "st": "c_f27806" },\n  { "start": 36, "len": 5, "st": "c_f7b503" },\n  { "start": 42, "len": 5, "st": "c_15a85f" },\n  { "start": 48, "len": 5, "st": "f_13" },\n  { "start": 54, "len": 5, "st": "f_18" },\n  { "start": 60, "len": 5, "st": "lst_1" },\n  { "start": 66, "len": 5, "st": "lst_2" },\n  { "start": 72, "len": 5, "st": "ind_$", "indentSize": 1 }\n]',
 				displayOptions: {
 					show: {
 						messageInputStyle: ['fields'],
 						styleInputMode: ['json'],
 					},
 				},
-				description: 'Nhập mảng JSON định dạng (e.g., [{"start": 0, "len": 5, "st": "b"}])',
+					description: 'Nhập mảng JSON định dạng theo mẫu đầy đủ; bạn có thể xoá bớt các style không cần dùng.',
 			},
 			{
 				displayName: 'TTL (Time To Live)',
@@ -682,7 +735,11 @@ export class ZaloSendMessage implements INodeType {
 					const message = this.getNodeParameter('message', i) as string;
 					const urgency = this.getNodeParameter('urgency', i, 0) as number;
 					const quote = this.getNodeParameter('quote', i, {}) as any;
-					const mentions = this.getNodeParameter('mentions', i, {}) as any;
+					const mentionsInputMode = this.getNodeParameter('mentionsInputMode', i, 'fields') as string;
+					const mentions =
+						mentionsInputMode === 'json'
+							? this.getNodeParameter('mentionsJson', i, '[]')
+							: this.getNodeParameter('mentions', i, {}) as any;
 					const styleInputMode = this.getNodeParameter('styleInputMode', i, 'fields') as string;
 					const ttl = this.getNodeParameter('ttl', i, 0) as number;
 					const attachments = this.getNodeParameter('attachments', i, {}) as any;
@@ -716,12 +773,15 @@ export class ZaloSendMessage implements INodeType {
 					}
 
 					// Add mentions if specified
-					if (mentions && mentions.mention && mentions.mention.length > 0) {
+					if (mentions) {
+						const mentionEntries = parseMentionsInput(mentions);
+						if (mentionEntries.length > 0) {
 						if (type !== ThreadType.Group) {
 							throw new ApplicationError('Mentions chỉ hỗ trợ khi Type = Group');
 						}
 
 						messageContent.mentions = buildMentionsFromFields(message, mentions);
+						}
 					}
 
 					// Add styles if specified
