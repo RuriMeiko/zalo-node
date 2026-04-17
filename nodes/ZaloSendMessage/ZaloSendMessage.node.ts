@@ -20,6 +20,66 @@ type MentionInput = {
 	len?: number;
 };
 
+type MentionInputLike = MentionInput & {
+	userId?: string;
+	id?: string;
+	start?: number;
+	offset?: number;
+	length?: number;
+};
+
+function parseMentionsInput(mentions: unknown): MentionInput[] {
+	if (!mentions) {
+		return [];
+	}
+
+	let normalized: unknown = mentions;
+
+	if (typeof normalized === 'string') {
+		try {
+			normalized = JSON.parse(normalized);
+		} catch {
+			return [];
+		}
+	}
+
+	if (Array.isArray(normalized)) {
+		return normalized.map((mention) => normalizeMentionInput(mention));
+	}
+
+	if (typeof normalized === 'object') {
+		const candidate = normalized as {
+			mention?: unknown;
+			mentions?: unknown;
+		};
+
+		if (Array.isArray(candidate.mention)) {
+			return candidate.mention.map((mention) => normalizeMentionInput(mention));
+		}
+
+		if (Array.isArray(candidate.mentions)) {
+			return candidate.mentions.map((mention) => normalizeMentionInput(mention));
+		}
+
+		return [normalizeMentionInput(candidate)];
+	}
+
+	return [];
+}
+
+function normalizeMentionInput(mention: unknown): MentionInput {
+	const candidate = (mention ?? {}) as MentionInputLike;
+
+	return {
+		uid: candidate.uid ?? candidate.userId ?? candidate.id,
+		mode: candidate.mode,
+		text: candidate.text,
+		occurrence: candidate.occurrence,
+		pos: candidate.pos ?? candidate.start ?? candidate.offset,
+		len: candidate.len ?? candidate.length,
+	};
+}
+
 function findNthOccurrence(message: string, mentionText: string, occurrence: number): number {
 	let fromIndex = 0;
 
@@ -42,9 +102,9 @@ function findNthOccurrence(message: string, mentionText: string, occurrence: num
 
 function buildMentionsFromFields(
 	message: string,
-	mentions: { mention?: MentionInput[] } | undefined,
+	mentions: unknown,
 ) {
-	const mentionEntries = Array.isArray(mentions?.mention) ? mentions.mention : [];
+	const mentionEntries = parseMentionsInput(mentions);
 
 	return mentionEntries.map((mention, index) => {
 		const userId = mention.uid?.trim();
@@ -53,9 +113,12 @@ function buildMentionsFromFields(
 			throw new ApplicationError(`Mention #${index + 1}: thiếu User ID`);
 		}
 
-		if (mention.mode === 'manual') {
-			const pos = Number(mention.pos ?? 0);
-			const len = Number(mention.len ?? 0);
+		const manualPos = mention.pos;
+		const manualLen = mention.len;
+		const hasManualPosition = manualPos !== undefined || manualLen !== undefined;
+		if (mention.mode === 'manual' && hasManualPosition) {
+			const pos = Number(manualPos ?? 0);
+			const len = Number(manualLen ?? 0);
 
 			if (pos < 0) {
 				throw new ApplicationError(`Mention #${index + 1}: Position phải lớn hơn hoặc bằng 0`);
@@ -72,25 +135,45 @@ function buildMentionsFromFields(
 			};
 		}
 
-		const mentionText = mention.text ?? '';
-		const occurrence = Math.max(1, Number(mention.occurrence ?? 1));
+		if (hasManualPosition) {
+			const pos = Number(manualPos ?? 0);
+			const len = Number(manualLen ?? 0);
 
-		if (mentionText.length === 0) {
-			throw new ApplicationError(`Mention #${index + 1}: thiếu Mention Text`);
+			if (pos < 0) {
+				throw new ApplicationError(`Mention #${index + 1}: Position phải lớn hơn hoặc bằng 0`);
+			}
+
+			if (len <= 0) {
+				throw new ApplicationError(`Mention #${index + 1}: Length phải lớn hơn 0`);
+			}
+
+			return {
+				pos,
+				uid: userId,
+				len,
+			};
 		}
 
-		const pos = findNthOccurrence(message, mentionText, occurrence);
+		const mentionText = mention.text?.trim() ?? '';
+		if (mentionText.length > 0) {
+			const occurrence = Math.max(1, Number(mention.occurrence ?? 1));
+			const pos = findNthOccurrence(message, mentionText, occurrence);
 
-		if (pos === -1) {
-			throw new ApplicationError(
-				`Mention #${index + 1}: không tìm thấy "${mentionText}" lần thứ ${occurrence} trong Message`,
-			);
+			if (pos === -1) {
+				throw new ApplicationError(
+					`Mention #${index + 1}: không tìm thấy "${mentionText}" lần thứ ${occurrence} trong Message`,
+				);
+			}
+
+			return {
+				pos,
+				uid: userId,
+				len: mentionText.length,
+			};
 		}
 
 		return {
-			pos,
 			uid: userId,
-			len: mentionText.length,
 		};
 	});
 }
@@ -297,7 +380,7 @@ export class ZaloSendMessage implements INodeType {
 				placeholder: 'Add Mention',
 				default: {},
 				description:
-					'Chỉ áp dụng cho Type = Group. Có thể nhập Mention Text để tự tìm vị trí trong Message hoặc nhập Position/Length thủ công.',
+					'Chỉ áp dụng cho Type = Group. Có thể nhập nhiều mention để tag nhiều người; hỗ trợ cả mảng mention chuẩn hoặc object từ UI.',
 				options: [
 					{
 						name: 'mention',
