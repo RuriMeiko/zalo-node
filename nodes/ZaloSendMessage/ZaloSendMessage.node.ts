@@ -1,14 +1,99 @@
 import {
+	ApplicationError,
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	NodeOperationError
+	NodeOperationError,
 } from 'n8n-workflow';
 import { API, ThreadType, Zalo } from 'zca-js';
 import { saveFile, removeFile } from '../utils/helper';
 
 let api: API | undefined;
+
+type MentionInput = {
+	uid?: string;
+	mode?: 'text' | 'manual';
+	text?: string;
+	occurrence?: number;
+	pos?: number;
+	len?: number;
+};
+
+function findNthOccurrence(message: string, mentionText: string, occurrence: number): number {
+	let fromIndex = 0;
+
+	for (let currentOccurrence = 1; currentOccurrence <= occurrence; currentOccurrence++) {
+		const matchIndex = message.indexOf(mentionText, fromIndex);
+
+		if (matchIndex === -1) {
+			return -1;
+		}
+
+		if (currentOccurrence === occurrence) {
+			return matchIndex;
+		}
+
+		fromIndex = matchIndex + mentionText.length;
+	}
+
+	return -1;
+}
+
+function buildMentionsFromFields(
+	message: string,
+	mentions: { mention?: MentionInput[] } | undefined,
+) {
+	const mentionEntries = Array.isArray(mentions?.mention) ? mentions.mention : [];
+
+	return mentionEntries.map((mention, index) => {
+		const userId = mention.uid?.trim();
+
+		if (!userId) {
+			throw new ApplicationError(`Mention #${index + 1}: thiếu User ID`);
+		}
+
+		if (mention.mode === 'manual') {
+			const pos = Number(mention.pos ?? 0);
+			const len = Number(mention.len ?? 0);
+
+			if (pos < 0) {
+				throw new ApplicationError(`Mention #${index + 1}: Position phải lớn hơn hoặc bằng 0`);
+			}
+
+			if (len <= 0) {
+				throw new ApplicationError(`Mention #${index + 1}: Length phải lớn hơn 0`);
+			}
+
+			return {
+				pos,
+				uid: userId,
+				len,
+			};
+		}
+
+		const mentionText = mention.text ?? '';
+		const occurrence = Math.max(1, Number(mention.occurrence ?? 1));
+
+		if (mentionText.length === 0) {
+			throw new ApplicationError(`Mention #${index + 1}: thiếu Mention Text`);
+		}
+
+		const pos = findNthOccurrence(message, mentionText, occurrence);
+
+		if (pos === -1) {
+			throw new ApplicationError(
+				`Mention #${index + 1}: không tìm thấy "${mentionText}" lần thứ ${occurrence} trong Message`,
+			);
+		}
+
+		return {
+			pos,
+			uid: userId,
+			len: mentionText.length,
+		};
+	});
+}
 
 export class ZaloSendMessage implements INodeType {
 	description: INodeTypeDescription = {
@@ -72,12 +157,7 @@ export class ZaloSendMessage implements INodeType {
 					},
 				],
 				default: 0,
-				displayOptions: {
-					show: {
-						messageInputStyle: ['fields'],
-					},
-				},
-				description: 'Loại của tin nhắn (user hoặc group)',
+				description: 'Loại thread nhận tin nhắn (user hoặc group)',
 			},
 			{
 				displayName: 'Message',
@@ -90,7 +170,8 @@ export class ZaloSendMessage implements INodeType {
 						messageInputStyle: ['fields'],
 					},
 				},
-				description: 'Nội dung tin nhắn cần gửi',
+				description:
+					'Nội dung tin nhắn cần gửi. Nếu dùng mention theo tên, hãy nhập đúng chuỗi xuất hiện trong tin nhắn, ví dụ @An.',
 			},
 			{
 				displayName: 'Message JSON',
@@ -215,11 +296,30 @@ export class ZaloSendMessage implements INodeType {
 				},
 				placeholder: 'Add Mention',
 				default: {},
+				description:
+					'Chỉ áp dụng cho Type = Group. Có thể nhập Mention Text để tự tìm vị trí trong Message hoặc nhập Position/Length thủ công.',
 				options: [
 					{
 						name: 'mention',
 						displayName: 'Mention',
 						values: [
+							{
+								displayName: 'Mode',
+								name: 'mode',
+								type: 'options',
+								options: [
+									{
+										name: 'By Mention Text',
+										value: 'text',
+									},
+									{
+										name: 'Manual Position',
+										value: 'manual',
+									},
+								],
+								default: 'text',
+								description: 'Chọn cách xác định vị trí mention',
+							},
 							{
 								displayName: 'User ID',
 								name: 'uid',
@@ -228,10 +328,42 @@ export class ZaloSendMessage implements INodeType {
 								description: 'ID của người dùng được mention',
 							},
 							{
+								displayName: 'Mention Text',
+								name: 'text',
+								type: 'string',
+								default: '',
+								displayOptions: {
+									show: {
+										mode: ['text'],
+									},
+								},
+								description: 'Chuỗi xuất hiện trong Message để mention, ví dụ @An',
+							},
+							{
+								displayName: 'Occurrence',
+								name: 'occurrence',
+								type: 'number',
+								default: 1,
+								typeOptions: {
+									minValue: 1,
+								},
+								displayOptions: {
+									show: {
+										mode: ['text'],
+									},
+								},
+								description: 'Lần xuất hiện thứ N của Mention Text trong Message',
+							},
+							{
 								displayName: 'Position',
 								name: 'pos',
 								type: 'number',
 								default: 0,
+								displayOptions: {
+									show: {
+										mode: ['manual'],
+									},
+								},
 								description: 'Vị trí mention trong tin nhắn',
 							},
 							{
@@ -239,6 +371,11 @@ export class ZaloSendMessage implements INodeType {
 								name: 'len',
 								type: 'number',
 								default: 0,
+								displayOptions: {
+									show: {
+										mode: ['manual'],
+									},
+								},
 								description: 'Độ dài của mention',
 							},
 						],
@@ -292,19 +429,19 @@ export class ZaloSendMessage implements INodeType {
 								name: 'st',
 								type: 'options',
 								options: [
-									{ name: 'Bold', value: 'b' },
-									{ name: 'Italic', value: 'i' },
-									{ name: 'Underline', value: 'u' },
-									{ name: 'Strike Through', value: 's' },
-									{ name: 'Red', value: 'c_db342e' },
-									{ name: 'Orange', value: 'c_f27806' },
-									{ name: 'Yellow', value: 'c_f7b503' },
-									{ name: 'Green', value: 'c_15a85f' },
-									{ name: 'Small', value: 'f_13' },
 									{ name: 'Big', value: 'f_18' },
-									{ name: 'Unordered List', value: 'lst_1' },
-									{ name: 'Ordered List', value: 'lst_2' },
+									{ name: 'Bold', value: 'b' },
+									{ name: 'Green', value: 'c_15a85f' },
 									{ name: 'Indent', value: 'ind_$' },
+									{ name: 'Italic', value: 'i' },
+									{ name: 'Orange', value: 'c_f27806' },
+									{ name: 'Ordered List', value: 'lst_2' },
+									{ name: 'Red', value: 'c_db342e' },
+									{ name: 'Small', value: 'f_13' },
+									{ name: 'Strikethrough', value: 's' },
+									{ name: 'Underline', value: 'u' },
+									{ name: 'Unordered List', value: 'lst_1' },
+									{ name: 'Yellow', value: 'c_f7b503' },
 								],
 								default: 'b',
 							},
@@ -339,7 +476,8 @@ export class ZaloSendMessage implements INodeType {
 				displayName: 'Styles JSON',
 				name: 'stylesJson',
 				type: 'json',
-				default: '[\n  { "start": 0, "len": 5, "st": "b" },\n  { "start": 6, "len": 5, "st": "i" },\n  { "start": 12, "len": 5, "st": "u" },\n  { "start": 18, "len": 5, "st": "s" },\n  { "start": 24, "len": 5, "st": "c_db342e" },\n  { "start": 30, "len": 5, "st": "f_18" },\n  { "start": 36, "len": 5, "st": "ind_$", "indentSize": 1 }\n]',
+				default:
+					'[\n  { "start": 0, "len": 5, "st": "b" },\n  { "start": 6, "len": 5, "st": "i" },\n  { "start": 12, "len": 5, "st": "u" },\n  { "start": 18, "len": 5, "st": "s" },\n  { "start": 24, "len": 5, "st": "c_db342e" },\n  { "start": 30, "len": 5, "st": "f_18" },\n  { "start": 36, "len": 5, "st": "ind_$", "indentSize": 1 }\n]',
 				displayOptions: {
 					show: {
 						messageInputStyle: ['fields'],
@@ -387,7 +525,7 @@ export class ZaloSendMessage implements INodeType {
 									{
 										name: 'Image URL/File URL',
 										value: 'url',
-									}
+									},
 								],
 								default: 'url',
 								description: 'Loại file đính kèm',
@@ -399,11 +537,11 @@ export class ZaloSendMessage implements INodeType {
 								default: '',
 								displayOptions: {
 									show: {
-										'type': ['url'],
+										type: ['url'],
 									},
 								},
 								description: 'URL công khai của ảnh hoặc file',
-							}
+							},
 						],
 					},
 				],
@@ -411,7 +549,6 @@ export class ZaloSendMessage implements INodeType {
 			},
 		],
 	};
-
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const returnData: INodeExecutionData[] = [];
@@ -429,17 +566,22 @@ export class ZaloSendMessage implements INodeType {
 			api = await zalo.login({
 				cookie: cookieFromCred,
 				imei: imeiFromCred,
-				userAgent: userAgentFromCred
+				userAgent: userAgentFromCred,
 			});
 
 			if (!api) {
-				throw new NodeOperationError(this.getNode(), 'Failed to initialize Zalo API. Check your credentials.');
+				throw new NodeOperationError(
+					this.getNode(),
+					'Failed to initialize Zalo API. Check your credentials.',
+				);
 			}
 		} catch (error) {
 			throw new NodeOperationError(this.getNode(), `Zalo login error: ${(error as Error).message}`);
 		}
 
 		for (let i = 0; i < items.length; i++) {
+			const tempAttachmentPaths: string[] = [];
+
 			try {
 				// Get parameters
 				const threadId = this.getNodeParameter('threadId', i) as string;
@@ -492,17 +634,18 @@ export class ZaloSendMessage implements INodeType {
 
 					// Add mentions if specified
 					if (mentions && mentions.mention && mentions.mention.length > 0) {
-						messageContent.mentions = mentions.mention.map((m: any) => ({
-							pos: m.pos || 0,
-							uid: m.uid,
-							len: m.len || 0,
-						}));
+						if (type !== ThreadType.Group) {
+							throw new ApplicationError('Mentions chỉ hỗ trợ khi Type = Group');
+						}
+
+						messageContent.mentions = buildMentionsFromFields(message, mentions);
 					}
 
 					// Add styles if specified
 					if (styleInputMode === 'json') {
 						const stylesJson = this.getNodeParameter('stylesJson', i, '[]') as string;
-						messageContent.styles = typeof stylesJson === 'string' ? JSON.parse(stylesJson) : stylesJson;
+						messageContent.styles =
+							typeof stylesJson === 'string' ? JSON.parse(stylesJson) : stylesJson;
 					} else {
 						const styles = this.getNodeParameter('styles', i, {}) as any;
 						if (styles && styles.style && styles.style.length > 0) {
@@ -527,6 +670,12 @@ export class ZaloSendMessage implements INodeType {
 							let fileData;
 							if (attachment.type === 'url') {
 								fileData = await saveFile(attachment.imageUrl);
+
+								if (!fileData) {
+									throw new ApplicationError(`Không thể tải file từ URL: ${attachment.imageUrl}`);
+								}
+
+								tempAttachmentPaths.push(fileData);
 							}
 
 							messageContent.attachments.push(fileData);
@@ -545,30 +694,19 @@ export class ZaloSendMessage implements INodeType {
 				try {
 					const recipentObj = {
 						id: threadId,
-						type: type
-					}
+						type: type,
+					};
 					const result = await api.sendTypingEvent(recipentObj.id, recipentObj.type);
 					if (!!result) {
-						this.logger.info("Send! typing event")
+						this.logger.info('Send! typing event');
 					}
-				}
-				catch (e) {
-					this.logger.error("Cannot send typing event")
+				} catch (e) {
+					this.logger.error('Cannot send typing event');
 				}
 
 				// Send message
 				const response = await api.sendMessage(messageContent, threadId, type);
-
-				//Remove temp img
-				if (messageContent.attachments && messageContent.attachments.length > 0) {
-					for (const attachment of messageContent.attachments) {
-						this.logger.info(`Remove attachment: ${attachment}`);
-
-						removeFile(attachment)
-					}
-				}
 				this.logger.info('Message sent successfully', { threadId, type });
-
 
 				returnData.push({
 					json: {
@@ -579,7 +717,6 @@ export class ZaloSendMessage implements INodeType {
 						messageContent,
 					},
 				});
-
 			} catch (error) {
 				this.logger.error('Error sending Zalo message:', error);
 
@@ -592,6 +729,11 @@ export class ZaloSendMessage implements INodeType {
 					});
 				} else {
 					throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+				}
+			} finally {
+				for (const attachmentPath of tempAttachmentPaths) {
+					this.logger.info(`Remove attachment: ${attachmentPath}`);
+					removeFile(attachmentPath);
 				}
 			}
 		}

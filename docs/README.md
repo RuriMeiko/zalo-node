@@ -1,8 +1,9 @@
-#  N8N-NODES-ZALO-TOOLS
+# N8N-NODES-ZALO-TOOLS
 
 Nodes-Zalo-Tools cho n8n là một bộ công cụ cho phép bạn tích hợp các tính năng của Zalo cá nhân vào quy trình làm việc của n8n. Bộ công cụ này bao gồm các node để tương tác với Zalo qua nhiều chức năng.
 
 ## Tính năng
+
 - **Login Zalo Via QR**: Đăng nhập Zalo thông qua QR
 
 - **Zalo Message Trigger**: Nhận tin nhắn trực tiếp
@@ -29,6 +30,7 @@ Nodes-Zalo-Tools cho n8n là một bộ công cụ cho phép bạn tích hợp c
 ## Tài liệu Node
 
 - [Zalo OA Node](nodes/zalo-oa.md)
+- [Zalo Send Message Node](nodes/zalo-send-message.md)
 - [Zalo Group Node](nodes/zalo-group.md)
 - [Zalo User Node](nodes/zalo-user.md)
 
