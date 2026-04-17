@@ -620,7 +620,7 @@ export class ZaloSendMessage implements INodeType {
 						styleInputMode: ['json'],
 					},
 				},
-					description: 'Nhập mảng JSON định dạng theo mẫu đầy đủ; bạn có thể xoá bớt các style không cần dùng.',
+					description: 'Nhập mảng JSON định dạng theo mẫu đầy đủ; bạn có thể xoá bớt các style không cần dùng',
 			},
 			{
 				displayName: 'TTL (Time To Live)',
