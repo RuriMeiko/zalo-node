@@ -773,15 +773,14 @@ export class ZaloSendMessage implements INodeType {
 					}
 
 					// Add mentions if specified
-					if (mentions) {
-						const mentionEntries = parseMentionsInput(mentions);
-						if (mentionEntries.length > 0) {
+					const mentionEntries = parseMentionsInput(mentions);
+					const validMentions = mentionEntries.filter((m) => m.uid?.trim());
+					if (validMentions.length > 0) {
 						if (type !== ThreadType.Group) {
 							throw new ApplicationError('Mentions chỉ hỗ trợ khi Type = Group');
 						}
 
-						messageContent.mentions = buildMentionsFromFields(message, mentions);
-						}
+						messageContent.mentions = buildMentionsFromFields(message, validMentions);
 					}
 
 					// Add styles if specified
