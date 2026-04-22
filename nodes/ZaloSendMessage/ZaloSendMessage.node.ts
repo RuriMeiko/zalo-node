@@ -378,16 +378,7 @@ export class ZaloSendMessage implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Mention',
-				default: {
-					mention: [
-						{
-							mode: 'text',
-							uid: '0000000000000000',
-							text: '@An',
-							occurrence: 1,
-						},
-					],
-				},
+				default: {},
 				description:
 					'Chỉ áp dụng cho Type = Group. Có sẵn một mention mẫu để bạn chỉnh sửa nhanh; hỗ trợ cả mảng mention chuẩn hoặc object từ UI.',
 				options: [
